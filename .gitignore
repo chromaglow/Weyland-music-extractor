@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Project specific
+ffmpeg.exe
+*.mp3
+*.mp4
+*.mkv
+*.webm
+*.part
+*.ytdl
