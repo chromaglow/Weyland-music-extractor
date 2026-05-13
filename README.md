@@ -1,42 +1,42 @@
-# YouTube-DL GUI
+# Weyland-Yutani Music Extractor
 
-A clean, modern graphical interface for downloading videos and audio from YouTube, built with Python, `customtkinter`, and `yt-dlp`.
+> *Building better music. One track at a time.*
+
+A YouTube audio and video downloader with intelligent track splitting — automatically cuts albums and concert recordings into individual songs based on timestamps found in descriptions or comments.
 
 ## Features
-- **Easy to Use**: Simple paste-and-click interface.
-- **Auto-Cut Tracks**: Automatically splits videos (like concerts or albums) into individual tracks based on timestamps in the description or comments.
-- **Smart Tracklist**: Detects "00:00 Song" and "Song 00:00" formats. Includes a manual editor to confirm or tweak splits before cutting.
-- **Format Selection**: Choose between Best Quality (Auto), Audio Only (High Quality MP3), 1080p, or 720p.
-- **Output Control**: Select exactly where you want your files to go.
-- **Real-time Progress**: View download percentage directly in the app title.
-- **Modern UI**: Dark mode interface using CustomTkinter.
+
+- **Auto-split tracks** — detects `00:00 Song` and `Song 00:00` timestamp formats in descriptions and comments, then splits the download into numbered files. On by default.
+- **Audio quality tiers** — choose High (320 kbps), Medium (128 kbps), or Low (64 kbps) MP3
+- **Video download** — Best (auto), 1080p, or 720p
+- **Tracklist editor** — confirm or tweak track names and timestamps before cutting
+- **Output control** — choose exactly where files are saved
+- **Real-time progress** — download percentage shown in the title bar
 
 ## Requirements
 
-### 1. Python Libraries
-The included `start_gui.bat` will automatically install these for you.
-```bash
-pip install customtkinter yt-dlp
+### Python libraries
+`start_gui.bat` installs these automatically:
+```
+customtkinter
+yt-dlp
 ```
 
-### 2. FFmpeg (Bundled/Local)
-This tool uses `ffmpeg` for splitting videos and converting audio.
-- The script looks for `ffmpeg.exe` in the application folder first.
-- If not found, it falls back to the system `ffmpeg` (if installed in PATH).
+### FFmpeg
+Used for audio conversion and track splitting.
+- Place `ffmpeg.exe` in the same folder as the app (recommended)
+- Or install FFmpeg system-wide and ensure it's on your PATH
 
-**Note:** Ensure `ffmpeg.exe` is present in this folder for the best experience.
+## How to run
 
-## How to Run
-
-1. **Double-click `start_gui.bat`**.
-   - This checks for updates, installs requirements, and launches the app.
+Double-click `start_gui.bat` — it installs dependencies and launches the app.
 
 ## Usage
-1. Paste a YouTube URL (e.g., a concert or album) into the input box.
-2. Click **Fetch Formats**.
-3. Select your desired quality.
-   - *Tip:* Select "Best Audio (High Quality)" for music albums.
-4. (Optional) Check **Auto Split by Chapters/Tracklist** to cut the video into songs.
-5. Click **Download Selected**.
-6. If Auto Split is on, a popup will ask you to confirm the track names and times.
-7. Files will be saved to your selected **Output Folder**.
+
+1. Paste a YouTube URL into the input box
+2. Click **Fetch Formats**
+3. Select audio quality (High / Medium / Low) or a video format
+4. **Auto-split** is on by default — uncheck it if you want a single file
+5. Click **Download Selected**
+6. If auto-split is on, confirm the detected track list in the popup
+7. Files are saved to your chosen output folder (defaults to the app directory)
