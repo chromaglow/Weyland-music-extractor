@@ -4,6 +4,10 @@ import re
 _TIME = r'(?:\d{1,2}:)?\d{1,2}:\d{2}'
 
 
+# "start - end" range (hyphen, en dash, em dash); the end time is discarded.
+_RANGE = r'(?P<time>' + _TIME + r')\s*[-–—]\s*' + _TIME
+
+
 def _norm_time(t):
     parts = [int(x) for x in t.split(':')]
     if len(parts) == 2:
@@ -22,7 +26,9 @@ def scan_text(text):
     found = []
     for line in text.split('\n'):
         line = line.strip()
-        m = re.search(r'^(?P<time>' + _TIME + r')\s+(?P<title>.+)$', line) or \
+        m = re.search(r'^[\[(]?' + _RANGE + r'[\])]?\s+(?P<title>.+)$', line) or \
+            re.search(r'^(?P<title>.+?)\s+[\[(]' + _RANGE + r'[\])]$', line) or \
+            re.search(r'^(?P<time>' + _TIME + r')\s+(?P<title>.+)$', line) or \
             re.search(r'^(?P<title>.+?)\s+(?P<time>' + _TIME + r')$', line)
         if m:
             found.append((_norm_time(m.group('time')), _strip_title(m.group('title'))))
@@ -36,6 +42,8 @@ def parse_manual_text(text):
     found = []
     for line in text.split('\n'):
         line = re.sub(r'^\s*\d{1,3}\s*[.)\-]\s+', '', line)  # leading track number
+        line = re.sub(r'(?<![\d:])(' + _TIME + r')\s*[-–—]\s*' + _TIME + r'(?![\d:])',
+                      r'\1', line)  # drop range end time
         m = re.search(r'(?<![\d:])(?P<time>' + _TIME + r')(?![\d:])', line)
         if not m:
             continue

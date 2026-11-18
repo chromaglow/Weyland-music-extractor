@@ -34,3 +34,21 @@ def test_manual_text_ocr_noise_bullets_pipes_spacing():
     text = "•  0:00   Intro\n| 4:30—Middle Part\n· 9:10 : Closer ~"
     assert tl.parse_manual_text(text) == [
         ("00:00:00", "Intro"), ("00:04:30", "Middle Part"), ("00:09:10", "Closer")]
+
+
+def test_scan_title_with_parenthesised_range():
+    text = ("The Lonely Road (0:02 - 8:36)\nSmoke in the Wind (8:36 - 12:06)\n"
+            "What Remains to Be Found (57:46 - 1:01:04)")
+    assert tl.scan_text(text) == [
+        ("00:00:02", "The Lonely Road"), ("00:08:36", "Smoke in the Wind"),
+        ("00:57:46", "What Remains to Be Found")]
+
+
+def test_scan_range_variants_dash_types_brackets_and_leading():
+    text = "A [0:00 – 3:00]\nB (3:00 — 5:00)\n5:00 - 7:00 C"
+    assert tl.scan_text(text) == [("00:00:00", "A"), ("00:03:00", "B"), ("00:05:00", "C")]
+
+
+def test_manual_text_strips_range_end():
+    assert tl.parse_manual_text("Song (0:02 - 8:36)\nOther (8:36 - 12:06)") == [
+        ("00:00:02", "Song"), ("00:08:36", "Other")]
