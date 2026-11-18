@@ -5,6 +5,7 @@ import os
 import sys
 import re
 import subprocess
+import tracklist as tracklist_mod
 from tkinter import filedialog
 
 # ── Hacker Noir Palette ──────────────────────────────────────────────────────
@@ -188,23 +189,7 @@ class YoutubeDLApp(ctk.CTk):
     # ── Tracklist Parsing ─────────────────────────────────────────────────────
 
     def parse_tracklist(self, info):
-        def scan_text(text):
-            if not text:
-                return []
-            found = []
-            for line in text.split('\n'):
-                line = line.strip()
-                m = re.search(r'^(?P<time>(?:\d{1,2}:)?\d{1,2}:\d{2})\s+(?P<title>.+)$', line) or \
-                    re.search(r'^(?P<title>.+?)\s+(?P<time>(?:\d{1,2}:)?\d{1,2}:\d{2})$', line)
-                if m:
-                    t = m.group('time')
-                    if len(t.split(':')) == 2:
-                        t = "00:" + t
-                    title = re.sub(r'^[-\s]+|[-\s]+$', '', m.group('title').strip())
-                    found.append((t, title))
-            return found
-
-        d_matches = scan_text(info.get('description', ''))
+        d_matches = tracklist_mod.scan_text(info.get('description', ''))
         if len(d_matches) >= 2:
             return d_matches
 
@@ -212,11 +197,45 @@ class YoutubeDLApp(ctk.CTk):
         for c in info.get('comments', []):
             if not isinstance(c, dict):
                 continue
-            matches = scan_text(c.get('text', ''))
+            matches = tracklist_mod.scan_text(c.get('text', ''))
             if len(matches) > len(best):
                 best = matches
 
         return best if len(best) > len(d_matches) else d_matches
+
+    def manual_tracklist_dialog(self):
+        """Ask the user to paste a track list. Returns parsed list, or None to skip."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Enter Tracklist Manually")
+        dialog.geometry("520x480")
+        dialog.configure(fg_color=BG)
+        ctk.CTkLabel(
+            dialog, text="No tracklist found. Paste track times and names, one per line\n(e.g. 0:00 Intro). Leave empty to download as a single file.",
+            text_color=FG, font=FONT_SMALL, justify="left"
+        ).pack(anchor="w", padx=10, pady=(10, 4))
+        box = ctk.CTkTextbox(dialog, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, border_width=1, font=FONT_SMALL)
+        box.pack(fill="both", expand=True, padx=10, pady=4)
+        status = ctk.CTkLabel(dialog, text="", text_color=FG_DIM, font=FONT_SMALL)
+        status.pack()
+        result = {'data': None}
+
+        def on_ok():
+            text = box.get("1.0", "end").strip()
+            if not text:
+                dialog.destroy()
+                return
+            parsed = tracklist_mod.parse_manual_text(text)
+            if not parsed:
+                status.configure(text="No lines with a time (m:ss or h:mm:ss) were found.")
+                return
+            result['data'] = parsed
+            dialog.destroy()
+
+        _btn(dialog, "Use This Tracklist", on_ok).pack(pady=5)
+        _btn(dialog, "Skip (single file)", dialog.destroy).pack(pady=(0, 10))
+        dialog.grab_set()
+        dialog.wait_window()
+        return result['data']
 
     def confirm_tracklist(self, tracklist):
         dialog = ctk.CTkToplevel(self)
@@ -274,10 +293,6 @@ class YoutubeDLApp(ctk.CTk):
 
         _, ext = os.path.splitext(input_file)
 
-        def to_seconds(t):
-            parts = list(map(int, t.split(':')))
-            return parts[0]*3600 + parts[1]*60 + parts[2] if len(parts) == 3 else parts[0]*60 + parts[1]
-
         for i, (start_time, title) in enumerate(tracklist):
             safe = "".join(c for c in title if c.isalpha() or c.isdigit() or c == ' ').rstrip()
             out_path = os.path.join(self.output_folder, f"{i+1:02d} - {safe}{ext}")
@@ -287,7 +302,8 @@ class YoutubeDLApp(ctk.CTk):
             cmd.append(out_path)
             self.log(f"export: {i+1:02d} - {safe}")
             try:
-                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             except Exception as e:
                 self.log(f"split error: {e}")
 
@@ -318,8 +334,13 @@ class YoutubeDLApp(ctk.CTk):
                     self.log(f"comment fetch failed: {e}")
 
             if not tracklist:
-                self.log("no tracklist found — downloading as single file.")
-            else:
+                self.log("no tracklist found automatically.")
+                tracklist = self.manual_tracklist_dialog()
+                if tracklist is None:
+                    self.log("no tracklist — downloading as single file.")
+                    tracklist = []
+
+            if tracklist:
                 res = self.confirm_tracklist(tracklist)
                 if not res['confirmed']:
                     self.log("cancelled.")
