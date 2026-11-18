@@ -44,6 +44,156 @@ def _radio(parent, text, variable, value):
     )
 
 
+def _btn_primary(parent, text, command, **kw):
+    return ctk.CTkButton(
+        parent, text=text, command=command,
+        fg_color=FG_DIM, hover_color=FG, text_color=BG,
+        border_color=FG, border_width=1,
+        font=("Share Tech Mono", 11, "bold"), **kw
+    )
+
+
+class _Ui:
+    """Plain attribute bag for a built dialog."""
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def _setup_dialog(dialog, title, width, height, min_w, min_h):
+    dialog.title(title)
+    dialog.geometry(f"{width}x{height}")
+    dialog.minsize(min_w, min_h)
+    dialog.resizable(True, True)
+    dialog.configure(fg_color=BG)
+
+
+def build_manual_tracklist_dialog(parent, ocr_engine=None, clipboard_image=None, pick_image=None):
+    """Build (but do not show modally) the manual tracklist dialog.
+
+    The button row is packed at the bottom BEFORE the expanding textbox, so the
+    action buttons keep their space whatever the window size or display scaling.
+    """
+    ocr_engine = ocr_engine or ocr_mod.windows_ocr
+    clipboard_image = clipboard_image or ocr_mod.clipboard_image_path
+    min_size = (520, 400)
+    dialog = ctk.CTkToplevel(parent)
+    _setup_dialog(dialog, "Enter Tracklist Manually", 560, 520, *min_size)
+
+    btn_row = ctk.CTkFrame(dialog, fg_color=BG)
+    btn_row.pack(side="bottom", fill="x", padx=10, pady=(4, 10))
+    status = ctk.CTkLabel(dialog, text="", text_color=FG_DIM, font=FONT_SMALL, wraplength=500, justify="left")
+    status.pack(side="bottom", anchor="w", padx=10)
+    ctk.CTkLabel(
+        dialog, text="No tracklist found. Paste track times and names, one per line\n(e.g. 0:00 Intro), or paste/read a screenshot. Leave empty to download as a single file.",
+        text_color=FG, font=FONT_SMALL, justify="left", wraplength=500
+    ).pack(side="top", anchor="w", padx=10, pady=(10, 4))
+    box = ctk.CTkTextbox(dialog, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, border_width=1, font=FONT_SMALL)
+    box.pack(side="top", fill="both", expand=True, padx=10, pady=4)
+    result = {'data': None}
+
+    def on_ok(event=None):
+        text = box.get("1.0", "end").strip()
+        if not text:
+            dialog.destroy()
+            return "break"
+        parsed = tracklist_mod.parse_manual_text(text)
+        if not parsed:
+            status.configure(text="No lines with a time (m:ss or h:mm:ss) were found.")
+            return "break"
+        result['data'] = parsed
+        dialog.destroy()
+        return "break"
+
+    def read_image(path):
+        status.configure(text="Reading text from image...")
+        dialog.update_idletasks()
+        text, err = ocr_mod.image_to_text(path, engine=ocr_engine)
+        if err:
+            status.configure(text=err + " You can still paste the text.")
+            return
+        existing = box.get("1.0", "end").strip()
+        box.delete("1.0", "end")
+        box.insert("1.0", (existing + chr(10) if existing else "") + text)
+        status.configure(text="Text read from image. Check and correct it, then click Use This Tracklist (Ctrl+Enter).")
+
+    def on_image():
+        if pick_image:
+            path = pick_image()
+        else:
+            path = filedialog.askopenfilename(
+                parent=dialog, title="Choose a screenshot of the tracklist",
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff"), ("All files", "*.*")])
+        if path:
+            read_image(path)
+
+    def on_paste(event=None):
+        """Ctrl+V: an image on the clipboard is OCR'd; text paste is left to the default."""
+        path = clipboard_image()
+        if not path:
+            return None
+        read_image(path)
+        return "break"
+
+    btn_ok = _btn_primary(btn_row, "Use This Tracklist", on_ok)
+    btn_ok.pack(side="right", padx=(6, 0))
+    btn_skip = _btn(btn_row, "Skip (single file)", dialog.destroy)
+    btn_skip.pack(side="right", padx=(6, 0))
+    btn_image = _btn(btn_row, "Read From Image...", on_image)
+    btn_image.pack(side="left")
+
+    dialog.bind("<Control-Return>", on_ok)
+    box._textbox.bind("<Control-Return>", on_ok)
+    box._textbox.bind("<Control-v>", on_paste)
+    box._textbox.bind("<Control-V>", on_paste)
+    return _Ui(dialog=dialog, box=box, status=status, result=result, min_size=min_size,
+               btn_ok=btn_ok, btn_skip=btn_skip, btn_image=btn_image,
+               on_ok=on_ok, on_image=on_image, on_paste=on_paste)
+
+
+def build_confirm_dialog(parent, tracklist):
+    """Build the confirm dialog; button row is reserved first so it is never clipped."""
+    min_size = (480, 360)
+    dialog = ctk.CTkToplevel(parent)
+    _setup_dialog(dialog, "Confirm Tracklist", 560, 620, *min_size)
+
+    btn_row = ctk.CTkFrame(dialog, fg_color=BG)
+    btn_row.pack(side="bottom", fill="x", padx=10, pady=(4, 10))
+    list_frame = ctk.CTkScrollableFrame(
+        dialog, fg_color=BG_FRAME, border_color=BORDER, border_width=1,
+        scrollbar_button_color=BORDER, scrollbar_button_hover_color=FG_DIM
+    )
+    list_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+
+    entries = []
+    for time, title in tracklist:
+        row = ctk.CTkFrame(list_frame, fg_color=BG_FRAME)
+        row.pack(fill="x", pady=2)
+
+        t_entry = ctk.CTkEntry(row, width=80, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, font=FONT_SMALL)
+        t_entry.insert(0, time)
+        t_entry.pack(side="left", padx=5)
+
+        n_entry = ctk.CTkEntry(row, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, font=FONT_SMALL)
+        n_entry.insert(0, title)
+        n_entry.pack(side="left", fill="x", expand=True, padx=5)
+
+        entries.append((t_entry, n_entry))
+
+    result = {'confirmed': False, 'data': []}
+
+    def on_confirm(event=None):
+        result['data'] = [(t.get(), n.get()) for t, n in entries]
+        result['confirmed'] = True
+        dialog.destroy()
+
+    btn_confirm = _btn_primary(btn_row, "Confirm & Split", on_confirm)
+    btn_confirm.pack(side="right", padx=(6, 0))
+    _btn(btn_row, "Cancel", dialog.destroy).pack(side="right", padx=(6, 0))
+    dialog.bind("<Control-Return>", on_confirm)
+    return _Ui(dialog=dialog, list_frame=list_frame, entries=entries, result=result,
+               min_size=min_size, btn_confirm=btn_confirm, on_confirm=on_confirm)
+
+
 class YoutubeDLApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -206,98 +356,15 @@ class YoutubeDLApp(ctk.CTk):
 
     def manual_tracklist_dialog(self):
         """Ask the user to paste a track list. Returns parsed list, or None to skip."""
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Enter Tracklist Manually")
-        dialog.geometry("520x480")
-        dialog.configure(fg_color=BG)
-        ctk.CTkLabel(
-            dialog, text="No tracklist found. Paste track times and names, one per line\n(e.g. 0:00 Intro). Leave empty to download as a single file.",
-            text_color=FG, font=FONT_SMALL, justify="left"
-        ).pack(anchor="w", padx=10, pady=(10, 4))
-        box = ctk.CTkTextbox(dialog, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, border_width=1, font=FONT_SMALL)
-        box.pack(fill="both", expand=True, padx=10, pady=4)
-        status = ctk.CTkLabel(dialog, text="", text_color=FG_DIM, font=FONT_SMALL)
-        status.pack()
-        result = {'data': None}
-
-        def on_ok():
-            text = box.get("1.0", "end").strip()
-            if not text:
-                dialog.destroy()
-                return
-            parsed = tracklist_mod.parse_manual_text(text)
-            if not parsed:
-                status.configure(text="No lines with a time (m:ss or h:mm:ss) were found.")
-                return
-            result['data'] = parsed
-            dialog.destroy()
-
-        def on_image():
-            path = filedialog.askopenfilename(
-                parent=dialog, title="Choose a screenshot of the tracklist",
-                filetypes=[("Images", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff"), ("All files", "*.*")])
-            if not path:
-                return
-            status.configure(text="Reading text from image...")
-            dialog.update_idletasks()
-            text, err = ocr_mod.image_to_text(path)
-            if err:
-                status.configure(text=err + " You can still paste the text.")
-                return
-            existing = box.get("1.0", "end").strip()
-            box.delete("1.0", "end")
-            box.insert("1.0", (existing + chr(10) if existing else "") + text)
-            status.configure(text="Text read from image. Check and correct it, then click Use This Tracklist.")
-
-        _btn(dialog, "Read From Image...", on_image).pack(pady=(5, 0))
-        _btn(dialog, "Use This Tracklist", on_ok).pack(pady=5)
-        _btn(dialog, "Skip (single file)", dialog.destroy).pack(pady=(0, 10))
-        dialog.grab_set()
-        dialog.wait_window()
-        return result['data']
+        ui = build_manual_tracklist_dialog(self)
+        ui.dialog.grab_set()
+        ui.dialog.wait_window()
+        return ui.result['data']
 
     def confirm_tracklist(self, tracklist):
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Confirm Tracklist")
-        dialog.geometry("520x580")
-        dialog.configure(fg_color=BG)
-
-        c_frame = ctk.CTkScrollableFrame(
-            dialog, fg_color=BG_FRAME, border_color=BORDER, border_width=1,
-            scrollbar_button_color=BORDER, scrollbar_button_hover_color=FG_DIM
-        )
-        c_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        entries = []
-        for time, title in tracklist:
-            row = ctk.CTkFrame(c_frame, fg_color=BG_FRAME)
-            row.pack(fill="x", pady=2)
-
-            t_entry = ctk.CTkEntry(row, width=80, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, font=FONT_SMALL)
-            t_entry.insert(0, time)
-            t_entry.pack(side="left", padx=5)
-
-            n_entry = ctk.CTkEntry(row, fg_color=BG_ENTRY, text_color=FG, border_color=BORDER, font=FONT_SMALL)
-            n_entry.insert(0, title)
-            n_entry.pack(side="left", fill="x", expand=True, padx=5)
-
-            entries.append((t_entry, n_entry))
-
-        result = {'confirmed': False, 'data': []}
-
-        def on_confirm():
-            result['data'] = [(t.get(), n.get()) for t, n in entries]
-            result['confirmed'] = True
-            dialog.destroy()
-
-        def on_cancel():
-            dialog.destroy()
-
-        _btn(dialog, "Confirm & Split", on_confirm).pack(pady=10)
-        _btn(dialog, "Cancel", on_cancel).pack(pady=5)
-
-        dialog.wait_window()
-        return result
+        ui = build_confirm_dialog(self, tracklist)
+        ui.dialog.wait_window()
+        return ui.result
 
     # ── Splitting ─────────────────────────────────────────────────────────────
 

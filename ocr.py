@@ -52,3 +52,24 @@ def image_to_text(path, engine=windows_ocr):
     if not text or not text.strip():
         return "", "No text was recognised in that image."
     return text, None
+
+
+def clipboard_image_path(grab=None):
+    """If the clipboard holds an image, save it to a temp PNG and return the path; else None.
+
+    Text on the clipboard (or no Pillow / any error) returns None so normal paste works.
+    """
+    try:
+        if grab is None:
+            from PIL import ImageGrab
+            grab = ImageGrab.grabclipboard
+        img = grab()
+        if img is None or isinstance(img, (list, tuple, str)) or not hasattr(img, "save"):
+            return None
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".png", prefix="wme-clip-")
+        os.close(fd)
+        img.save(path, "PNG")
+        return path
+    except Exception:
+        return None

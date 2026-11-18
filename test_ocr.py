@@ -23,3 +23,20 @@ def test_unexpected_error_is_caught():
         raise RuntimeError("bad image")
     text, err = ocr.image_to_text("x.png", engine=boom)
     assert text == "" and "bad image" in err
+
+
+def test_clipboard_image_saved_to_png(tmp_path):
+    from PIL import Image
+    import os
+    p = ocr.clipboard_image_path(grab=lambda: Image.new("RGB", (4, 4)))
+    try:
+        assert p and p.endswith(".png") and os.path.getsize(p) > 0
+    finally:
+        if p:
+            os.remove(p)
+
+
+def test_clipboard_without_image_returns_none():
+    assert ocr.clipboard_image_path(grab=lambda: None) is None
+    assert ocr.clipboard_image_path(grab=lambda: ["C:/a.txt"]) is None
+    assert ocr.clipboard_image_path(grab=lambda: (_ for _ in ()).throw(OSError("x"))) is None
