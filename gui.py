@@ -6,6 +6,7 @@ import sys
 import re
 import subprocess
 import tracklist as tracklist_mod
+import ocr as ocr_mod
 from tkinter import filedialog
 
 # ── Hacker Noir Palette ──────────────────────────────────────────────────────
@@ -231,6 +232,24 @@ class YoutubeDLApp(ctk.CTk):
             result['data'] = parsed
             dialog.destroy()
 
+        def on_image():
+            path = filedialog.askopenfilename(
+                parent=dialog, title="Choose a screenshot of the tracklist",
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff"), ("All files", "*.*")])
+            if not path:
+                return
+            status.configure(text="Reading text from image...")
+            dialog.update_idletasks()
+            text, err = ocr_mod.image_to_text(path)
+            if err:
+                status.configure(text=err + " You can still paste the text.")
+                return
+            existing = box.get("1.0", "end").strip()
+            box.delete("1.0", "end")
+            box.insert("1.0", (existing + chr(10) if existing else "") + text)
+            status.configure(text="Text read from image. Check and correct it, then click Use This Tracklist.")
+
+        _btn(dialog, "Read From Image...", on_image).pack(pady=(5, 0))
         _btn(dialog, "Use This Tracklist", on_ok).pack(pady=5)
         _btn(dialog, "Skip (single file)", dialog.destroy).pack(pady=(0, 10))
         dialog.grab_set()

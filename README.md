@@ -20,7 +20,9 @@ A YouTube audio and video downloader with intelligent track splitting — automa
 ```
 customtkinter
 yt-dlp
+winsdk
 ```
+`winsdk` is optional: it powers "Read From Image..." in the manual tracklist dialog using Windows' built-in text recognition. Without it, pasting text still works.
 
 ### FFmpeg
 Used for audio conversion and track splitting.

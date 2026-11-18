@@ -28,3 +28,9 @@ def test_manual_text_no_matches():
 def test_to_seconds():
     assert tl.to_seconds("01:02:03") == 3723
     assert tl.to_seconds("2:03") == 123
+
+
+def test_manual_text_ocr_noise_bullets_pipes_spacing():
+    text = "•  0:00   Intro\n| 4:30—Middle Part\n· 9:10 : Closer ~"
+    assert tl.parse_manual_text(text) == [
+        ("00:00:00", "Intro"), ("00:04:30", "Middle Part"), ("00:09:10", "Closer")]

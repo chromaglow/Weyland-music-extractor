@@ -40,7 +40,9 @@ def parse_manual_text(text):
         if not m:
             continue
         rest = line[:m.start()] + ' ' + line[m.end():]
-        rest = re.sub(r'[\[\]()]', ' ', rest)
+        rest = re.sub(r'[\[\]()|\u2022\u00b7~]', ' ', rest)
+        rest = re.sub(r'^\s*[:\u2014\u2013]+|[:\u2014\u2013]+\s*$', ' ', rest)
+        rest = re.sub(r'\s[:\u2014\u2013]+\s', ' ', rest)
         title = _strip_title(rest)
         title = re.sub(r'\s+', ' ', title)
         if title:
